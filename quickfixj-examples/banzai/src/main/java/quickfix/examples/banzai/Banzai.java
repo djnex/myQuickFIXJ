@@ -37,7 +37,7 @@ import quickfix.Initiator;
 import quickfix.LogFactory;
 import quickfix.MessageFactory;
 import quickfix.MessageStoreFactory;
-import quickfix.ScreenLogFactory;
+import quickfix.SLF4JLogFactory;
 import quickfix.Session;
 import quickfix.SessionID;
 import quickfix.SessionSettings;
@@ -102,7 +102,8 @@ public class Banzai {
         ExecutionTableModel executionTableModel = new ExecutionTableModel();
         BanzaiApplication application = new BanzaiApplication(orderTableModel, executionTableModel);
         MessageStoreFactory messageStoreFactory = new FileStoreFactory(settings);
-        LogFactory logFactory = new ScreenLogFactory(true, true, true, logHeartbeats);
+//        LogFactory logFactory = new ScreenLogFactory(true, true, true, logHeartbeats);
+        LogFactory logFactory = new SLF4JLogFactory(settings);
         MessageFactory messageFactory = new DefaultMessageFactory();
 
         initiator = new SocketInitiator(application, messageStoreFactory, settings, logFactory,

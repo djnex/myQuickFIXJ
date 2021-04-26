@@ -88,7 +88,7 @@ public class BanzaiApplication implements Application {
     }
 
     private void sending(Message message) {
-        SwingUtilities.invokeLater(() -> LOGGER.info("=====> sending message, type: {}", message.getClass().getSimpleName()));
+        SwingUtilities.invokeLater(() -> LOGGER.info("=====> Sending, type: {}", message.getClass().getSimpleName()));
     }
 
     private void received(Message message, SessionID sessionID) {
@@ -116,7 +116,7 @@ public class BanzaiApplication implements Application {
 
         public void run() {
             try {
-                LOGGER.info("=====> received message, type: {}", message.getClass().getSimpleName());
+                LOGGER.info("=====> Received, type: {}", message.getClass().getSimpleName());
                 MsgType msgType = new MsgType();
                 if (isAvailable) {
                     if (isMissingField) {
