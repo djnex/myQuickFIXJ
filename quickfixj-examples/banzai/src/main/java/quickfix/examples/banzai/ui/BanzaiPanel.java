@@ -47,6 +47,7 @@ public class BanzaiPanel extends JPanel implements Observer, ActionListener {
     private final OrderEntryPanel orderEntryPanel;
     private final OrderPanel orderPanel;
     private final CancelReplacePanel cancelReplacePanel;
+    private final DJCustomPanel djCustomPanel;
     private final OrderTableModel orderTableModel;
 
     public BanzaiPanel(OrderTableModel orderTableModel,
@@ -85,6 +86,11 @@ public class BanzaiPanel extends JPanel implements Observer, ActionListener {
         orderPanel.orderTable().getSelectionModel().addListSelectionListener(new OrderSelection());
         cancelReplacePanel.addActionListener(this);
         application.addOrderObserver(this);
+
+        djCustomPanel = new DJCustomPanel(application);
+        constraints.weighty = 0;
+        add(djCustomPanel, constraints);
+        djCustomPanel.setEnabled(false);
     }
 
     public void update(Observable o, Object arg) {

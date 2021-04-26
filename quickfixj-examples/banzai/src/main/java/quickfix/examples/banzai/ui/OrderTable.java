@@ -40,7 +40,7 @@ public class OrderTable extends JTable implements MouseListener {
     public Component prepareRenderer(TableCellRenderer renderer, int row, int column) {
         Order order = ((OrderTableModel) dataModel).getOrder(row);
 
-        int open = order.getOpen();
+        Double open = order.getOpen();
         double executed = order.getExecuted();
         boolean rejected = order.getRejected();
         boolean canceled = order.getCanceled();

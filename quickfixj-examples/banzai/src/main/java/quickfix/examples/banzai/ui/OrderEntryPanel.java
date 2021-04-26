@@ -19,11 +19,7 @@
 
 package quickfix.examples.banzai.ui;
 
-import java.awt.Color;
-import java.awt.Font;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
@@ -51,6 +47,7 @@ import quickfix.examples.banzai.OrderSide;
 import quickfix.examples.banzai.OrderTIF;
 import quickfix.examples.banzai.OrderTableModel;
 import quickfix.examples.banzai.OrderType;
+import quickfix.examples.banzai.SignedDoubleNumberTextField;
 
 @SuppressWarnings("unchecked")
 public class OrderEntryPanel extends JPanel implements Observer {
@@ -61,14 +58,14 @@ public class OrderEntryPanel extends JPanel implements Observer {
     private boolean sessionEntered = false;
 
     private final JTextField symbolTextField = new JTextField();
-    private final IntegerNumberTextField quantityTextField = new IntegerNumberTextField();
+    private final SignedDoubleNumberTextField quantityTextField = new SignedDoubleNumberTextField();
 
     private final JComboBox sideComboBox = new JComboBox(OrderSide.toArray());
     private final JComboBox typeComboBox = new JComboBox(OrderType.toArray());
     private final JComboBox tifComboBox = new JComboBox(OrderTIF.toArray());
 
-    private final DoubleNumberTextField limitPriceTextField = new DoubleNumberTextField();
-    private final DoubleNumberTextField stopPriceTextField = new DoubleNumberTextField();
+    private final SignedDoubleNumberTextField limitPriceTextField = new SignedDoubleNumberTextField();
+    private final SignedDoubleNumberTextField stopPriceTextField = new SignedDoubleNumberTextField();
 
     private final JComboBox sessionComboBox = new JComboBox();
 
@@ -77,6 +74,8 @@ public class OrderEntryPanel extends JPanel implements Observer {
 
     private final JLabel messageLabel = new JLabel(" ");
     private final JButton submitButton = new JButton("Submit");
+    private final JButton nosCancelButton = new JButton("NosCancel");
+    private final JButton nosAmendButton = new JButton("NosAmend");
 
     private OrderTableModel orderTableModel = null;
     private transient BanzaiApplication application = null;
@@ -101,6 +100,12 @@ public class OrderEntryPanel extends JPanel implements Observer {
         setBorder(BorderFactory.createEmptyBorder(5, 0, 5, 0));
         setLayout(new GridBagLayout());
         createComponents();
+        symbolTextField.setText("BTC/USDC");
+        quantityTextField.setText("1");
+        limitPriceTextField.setText("100");
+        sideComboBox.setSelectedItem(OrderSide.BUY);
+        typeComboBox.setSelectedItem(OrderType.LIMIT);
+        tifComboBox.setSelectedItem(OrderTIF.DAY);
     }
 
     public void addActionListener(ActionListener listener) {
@@ -152,12 +157,16 @@ public class OrderEntryPanel extends JPanel implements Observer {
         add(tifComboBox, ++x, y);
 
         constraints.insets = new Insets(3, 0, 0, 0);
-        constraints.gridwidth = GridBagConstraints.RELATIVE;
+//        constraints.gridwidth = GridBagConstraints.RELATIVE;
         sessionComboBox.setName("SessionComboBox");
-        add(sessionComboBox, 0, ++y);
-        constraints.gridwidth = GridBagConstraints.REMAINDER;
-        submitButton.setName("SubmitButton");
-        add(submitButton, x, y);
+        x = 0;
+        add(sessionComboBox, x, ++y);
+//        x = 0;
+        add(nosCancelButton, ++x, y);
+        add(nosAmendButton, ++x, y);
+        add(submitButton, ++x, y);
+//        constraints.gridwidth = GridBagConstraints.REMAINDER;
+//        submitButton.setName("SubmitButton");
         constraints.gridwidth = 0;
         add(messageLabel, 0, ++y);
 
@@ -169,8 +178,12 @@ public class OrderEntryPanel extends JPanel implements Observer {
         messageLabel.setFont(font);
         messageLabel.setForeground(Color.red);
         messageLabel.setHorizontalAlignment(JLabel.CENTER);
-        submitButton.setEnabled(false);
-        submitButton.addActionListener(new SubmitListener());
+        submitButton.setEnabled(true);
+        submitButton.addActionListener(new NewOrderSingleListener());
+        nosCancelButton.setEnabled(true);
+        nosAmendButton.setEnabled(true);
+        nosCancelButton.addActionListener(new NosCancelListener());
+        nosAmendButton.addActionListener(new NosAmendListener());
         activateSubmit();
     }
 
@@ -182,17 +195,17 @@ public class OrderEntryPanel extends JPanel implements Observer {
     }
 
     private void activateSubmit() {
-        OrderType type = (OrderType) typeComboBox.getSelectedItem();
-        boolean activate = symbolEntered && quantityEntered && sessionEntered;
-
-        if (type == OrderType.MARKET)
-            submitButton.setEnabled(activate);
-        else if (type == OrderType.LIMIT)
-            submitButton.setEnabled(activate && limitEntered);
-        else if (type == OrderType.STOP)
-            submitButton.setEnabled(activate && stopEntered);
-        else if (type == OrderType.STOP_LIMIT)
-            submitButton.setEnabled(activate && limitEntered && stopEntered);
+//        OrderType type = (OrderType) typeComboBox.getSelectedItem();
+//        boolean activate = symbolEntered && quantityEntered && sessionEntered;
+//
+//        if (type == OrderType.MARKET)
+//            submitButton.setEnabled(activate);
+//        else if (type == OrderType.LIMIT)
+//            submitButton.setEnabled(activate && limitEntered);
+//        else if (type == OrderType.STOP)
+//            submitButton.setEnabled(activate && stopEntered);
+//        else if (type == OrderType.STOP_LIMIT)
+//            submitButton.setEnabled(activate && limitEntered && stopEntered);
     }
 
     private class PriceListener implements ItemListener {
@@ -239,27 +252,52 @@ public class OrderEntryPanel extends JPanel implements Observer {
             sessionComboBox.removeItem(logonEvent.getSessionID());
     }
 
-    private class SubmitListener implements ActionListener {
+    private class NewOrderSingleListener implements ActionListener {
         public void actionPerformed(ActionEvent e) {
-            Order order = new Order();
-            order.setSide((OrderSide) sideComboBox.getSelectedItem());
-            order.setType((OrderType) typeComboBox.getSelectedItem());
-            order.setTIF((OrderTIF) tifComboBox.getSelectedItem());
-
-            order.setSymbol(symbolTextField.getText());
-            order.setQuantity(Integer.parseInt(quantityTextField.getText()));
-            order.setOpen(order.getQuantity());
-
-            OrderType type = order.getType();
-            if (type == OrderType.LIMIT || type == OrderType.STOP_LIMIT)
-                order.setLimit(limitPriceTextField.getText());
-            if (type == OrderType.STOP || type == OrderType.STOP_LIMIT)
-                order.setStop(stopPriceTextField.getText());
-            order.setSessionID((SessionID) sessionComboBox.getSelectedItem());
-
-            orderTableModel.addOrder(order);
-            application.send(order);
+            nosSubmit();
         }
+    }
+
+    private class NosCancelListener implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            Order order = nosSubmit();
+            application.cancel(order);
+        }
+    }
+
+    private class NosAmendListener implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            Order order = nosSubmit();
+            Order newOrder = (Order) order.clone();
+            newOrder.setQuantity(8.00);
+            application.replace(order, newOrder);
+        }
+    }
+
+    private Order nosSubmit() {
+        Order order = new Order();
+        order.setSide((OrderSide) sideComboBox.getSelectedItem());
+        order.setType((OrderType) typeComboBox.getSelectedItem());
+        order.setTIF((OrderTIF) tifComboBox.getSelectedItem());
+
+        order.setSymbol(symbolTextField.getText());
+        order.setQuantity(Double.parseDouble(quantityTextField.getText()));
+        order.setOpen(order.getQuantity());
+
+        OrderType type = order.getType();
+        if (type == OrderType.LIMIT || type == OrderType.STOP_LIMIT)
+            order.setLimit(limitPriceTextField.getText());
+        if (type == OrderType.STOP || type == OrderType.STOP_LIMIT)
+            order.setStop(stopPriceTextField.getText());
+        order.setSessionID((SessionID) sessionComboBox.getSelectedItem());
+
+        orderTableModel.addOrder(order);
+        application.send(order);
+        return order;
+    }
+
+    private SessionID getSessionID() {
+        return (SessionID) sessionComboBox.getSelectedItem();
     }
 
     private class SubmitActivator implements KeyListener, ItemListener {
@@ -280,6 +318,7 @@ public class OrderEntryPanel extends JPanel implements Observer {
         public void itemStateChanged(ItemEvent e) {
             sessionEntered = sessionComboBox.getSelectedItem() != null;
             activateSubmit();
+            application.setSessionID((SessionID) sessionComboBox.getSelectedItem());
         }
 
         private boolean testField(Object o) {

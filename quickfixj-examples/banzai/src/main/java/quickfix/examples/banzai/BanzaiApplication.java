@@ -19,6 +19,9 @@
 
 package quickfix.examples.banzai;
 
+import diginexMessages.DigiOrderMassCancelRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import quickfix.Application;
 import quickfix.DefaultMessageFactory;
 import quickfix.DoNotSend;
@@ -32,37 +35,9 @@ import quickfix.Session;
 import quickfix.SessionID;
 import quickfix.SessionNotFound;
 import quickfix.UnsupportedMessageType;
-import quickfix.field.AvgPx;
-import quickfix.field.BeginString;
-import quickfix.field.BusinessRejectReason;
-import quickfix.field.ClOrdID;
-import quickfix.field.CumQty;
-import quickfix.field.CxlType;
-import quickfix.field.DeliverToCompID;
-import quickfix.field.ExecID;
-import quickfix.field.HandlInst;
-import quickfix.field.LastPx;
-import quickfix.field.LastShares;
-import quickfix.field.LeavesQty;
-import quickfix.field.LocateReqd;
-import quickfix.field.MsgSeqNum;
-import quickfix.field.MsgType;
-import quickfix.field.OrdStatus;
-import quickfix.field.OrdType;
-import quickfix.field.OrderQty;
-import quickfix.field.OrigClOrdID;
-import quickfix.field.Price;
-import quickfix.field.RefMsgType;
-import quickfix.field.RefSeqNum;
-import quickfix.field.SenderCompID;
-import quickfix.field.SessionRejectReason;
-import quickfix.field.Side;
-import quickfix.field.StopPx;
-import quickfix.field.Symbol;
-import quickfix.field.TargetCompID;
-import quickfix.field.Text;
-import quickfix.field.TimeInForce;
-import quickfix.field.TransactTime;
+import quickfix.field.*;
+import quickfix.fix44.MarketDataRequest;
+import quickfix.fix44.OrderMassCancelReport;
 
 import javax.swing.*;
 import java.math.BigDecimal;
@@ -72,6 +47,7 @@ import java.util.Observable;
 import java.util.Observer;
 
 public class BanzaiApplication implements Application {
+    private final static Logger LOGGER = LoggerFactory.getLogger(BanzaiApplication.class);
     private final DefaultMessageFactory messageFactory = new DefaultMessageFactory();
     private OrderTableModel orderTableModel = null;
     private ExecutionTableModel executionTableModel = null;
@@ -79,11 +55,12 @@ public class BanzaiApplication implements Application {
     private final ObservableLogon observableLogon = new ObservableLogon();
     private boolean isAvailable = true;
     private boolean isMissingField;
+    private SessionID sessionID;
 
     static private final TwoWayMap sideMap = new TwoWayMap();
     static private final TwoWayMap typeMap = new TwoWayMap();
     static private final TwoWayMap tifMap = new TwoWayMap();
-    static private final HashMap<SessionID, HashSet<ExecID>> execIDs = new HashMap<>();
+    static private final HashMap<SessionID, HashSet<String>> execIDs = new HashMap<>();
 
     public BanzaiApplication(OrderTableModel orderTableModel,
             ExecutionTableModel executionTableModel) {
@@ -103,21 +80,29 @@ public class BanzaiApplication implements Application {
     }
 
     public void toAdmin(quickfix.Message message, SessionID sessionID) {
+        sending(message);
     }
 
     public void toApp(quickfix.Message message, SessionID sessionID) throws DoNotSend {
+        sending(message);
+    }
+
+    private void sending(Message message) {
+        SwingUtilities.invokeLater(() -> LOGGER.info("=====> sending message, type: {}", message.getClass().getSimpleName()));
+    }
+
+    private void received(Message message, SessionID sessionID) {
+        SwingUtilities.invokeLater(new MessageProcessor(message, sessionID));
     }
 
     public void fromAdmin(quickfix.Message message, SessionID sessionID) throws FieldNotFound,
             IncorrectDataFormat, IncorrectTagValue, RejectLogon {
+        received(message, sessionID);
     }
 
     public void fromApp(quickfix.Message message, SessionID sessionID) throws FieldNotFound,
             IncorrectDataFormat, IncorrectTagValue, UnsupportedMessageType {
-        try {
-            SwingUtilities.invokeLater(new MessageProcessor(message, sessionID));
-        } catch (Exception e) {
-        }
+        received(message, sessionID);
     }
 
     public class MessageProcessor implements Runnable {
@@ -131,31 +116,40 @@ public class BanzaiApplication implements Application {
 
         public void run() {
             try {
+                LOGGER.info("=====> received message, type: {}", message.getClass().getSimpleName());
                 MsgType msgType = new MsgType();
                 if (isAvailable) {
                     if (isMissingField) {
                         // For OpenFIX certification testing
-                        sendBusinessReject(message, BusinessRejectReason.CONDITIONALLY_REQUIRED_FIELD_MISSING, "Conditionally required field missing");
+//                        sendBusinessReject(message, BusinessRejectReason.CONDITIONALLY_REQUIRED_FIELD_MISSING, "Conditionally required field missing");
+                        LOGGER.error("Conditionally required field missing");
                     }
                     else if (message.getHeader().isSetField(DeliverToCompID.FIELD)) {
                         // This is here to support OpenFIX certification
-                        sendSessionReject(message, SessionRejectReason.COMPID_PROBLEM);
+//                        sendSessionReject(message, SessionRejectReason.COMPID_PROBLEM);
+                        LOGGER.error("sendSessionReject COMPID_PROBLEM");
                     } else if (message.getHeader().getField(msgType).valueEquals("8")) {
                         executionReport(message, sessionID);
                     } else if (message.getHeader().getField(msgType).valueEquals("9")) {
                         cancelReject(message, sessionID);
-                    } else {
-                        sendBusinessReject(message, BusinessRejectReason.UNSUPPORTED_MESSAGE_TYPE,
-                                "Unsupported Message Type");
                     }
                 } else {
-                    sendBusinessReject(message, BusinessRejectReason.APPLICATION_NOT_AVAILABLE,
-                            "Application not available");
+//                    sendBusinessReject(message, BusinessRejectReason.APPLICATION_NOT_AVAILABLE,
+//                            "Application not available");
+                    LOGGER.error("Application not available");
                 }
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }
+    }
+
+    public void setSessionID(SessionID sessionID) {
+        this.sessionID = sessionID;
+    }
+
+    public SessionID getSessionID() {
+        return sessionID;
     }
 
     private void sendSessionReject(Message message, int rejectReason) throws FieldNotFound,
@@ -194,14 +188,41 @@ public class BanzaiApplication implements Application {
 
     private void executionReport(Message message, SessionID sessionID) throws FieldNotFound {
 
-        ExecID execID = (ExecID) message.getField(new ExecID());
-        if (alreadyProcessed(execID, sessionID))
-            return;
+        OrderID orderID = (OrderID) message.getField(new OrderID());
+        if (orderID == null/* || alreadyProcessed(orderID.getValue(), sessionID)*/) {
+            LOGGER.error("{} don't exists", orderID);
+            return;            
+        }
 
         Order order = orderTableModel.getOrder(message.getField(new ClOrdID()).getValue());
         if (order == null) {
             return;
         }
+        order.setOrderId(orderID.getValue());
+
+//        if (message.getField(new Price()) != null) {
+//            double updatedValue = message.getField(new Price()).getValue();
+//            if (Double.compare(updatedValue, order.getLimit()) != 0) {
+//                order.setLimit(updatedValue);
+//            }    
+//        }
+//
+//        if (message.getField(new AvgPx()) != null) {
+//            double updatedValue = message.getField(new AvgPx()).getValue();
+//            if (Double.compare(updatedValue, order.getAvgPx()) != 0) {
+//                order.setAvgPx(updatedValue);
+//            }
+//        }
+//        
+//        double orderQty = message.getField(new OrderQty()).getValue();
+//        if (order.getQuantity() != (int) orderQty) {
+//            order.setQuantity((int) orderQty);
+//        }
+//        double cumQty = message.getField(new CumQty()).getValue();
+//        double openQty = orderQty - cumQty;
+//        if (Double.compare(order.getOpen(), openQty) != 0) {
+//            order.setOpen((int) openQty);
+//        }
 
         BigDecimal fillSize;
 
@@ -213,27 +234,57 @@ public class BanzaiApplication implements Application {
             // > FIX 4.1
             LeavesQty leavesQty = new LeavesQty();
             message.getField(leavesQty);
-            fillSize = new BigDecimal(order.getQuantity()).subtract(new BigDecimal("" + leavesQty.getValue()));
+            fillSize = BigDecimal.valueOf(order.getQuantity()).subtract(new BigDecimal("" + leavesQty.getValue()));
         }
 
         if (fillSize.compareTo(BigDecimal.ZERO) > 0) {
-            order.setOpen(order.getOpen() - (int) Double.parseDouble(fillSize.toPlainString()));
+            order.setOpen(BigDecimal.valueOf(order.getOpen()).subtract(fillSize).doubleValue());
             order.setExecuted(Double.parseDouble(message.getString(CumQty.FIELD)));
             order.setAvgPx(Double.parseDouble(message.getString(AvgPx.FIELD)));
         }
 
         OrdStatus ordStatus = (OrdStatus) message.getField(new OrdStatus());
+        ExecType execType = (ExecType) message.getField(new ExecType());
 
         if (ordStatus.valueEquals(OrdStatus.REJECTED)) {
             order.setRejected(true);
-            order.setOpen(0);
+            order.setOpen(0.00);
         } else if (ordStatus.valueEquals(OrdStatus.CANCELED)
                 || ordStatus.valueEquals(OrdStatus.DONE_FOR_DAY)) {
             order.setCanceled(true);
-            order.setOpen(0);
+            order.setOpen(0.00);
         } else if (ordStatus.valueEquals(OrdStatus.NEW)) {
             if (order.isNew()) {
                 order.setNew(false);
+            }
+        } else if (ordStatus.valueEquals(OrdStatus.FILLED)) {
+            order.setOpen(0.00);
+            order.setCanceled(true);
+        } else if (ordStatus.valueEquals(OrdStatus.PARTIALLY_FILLED) && execType.valueEquals(ExecType.REPLACED)) {
+            OrderQty orderQty = (OrderQty) message.getField(new OrderQty());
+            CumQty cumQty = (CumQty) message.getField(new CumQty());
+            LeavesQty leavesQty = (LeavesQty) message.getField(new LeavesQty());
+            if (leavesQty.getValue() > 0) {
+                order.setOpen(leavesQty.getValue());
+            } else {
+                order.setOpen(0.00);
+                order.setCanceled(true);
+            }
+            order.setQuantity(orderQty.getValue());
+            order.setExecuted(cumQty.getValue());
+        }
+        if (execType.valueEquals(ExecType.REPLACED)) {
+            Price price = (Price) message.getField(new Price());
+            if (!price.valueEquals(order.getLimit())) {
+                order.setLimit(price.getValue());
+            }
+            OrderQty orderQty = (OrderQty) message.getField(new OrderQty());
+            if (!orderQty.valueEquals(order.getQuantity())) {
+                order.setQuantity(orderQty.getValue());
+            }
+            LeavesQty leavesQty = (LeavesQty) message.getField(new LeavesQty());
+            if (!leavesQty.valueEquals(order.getOpen())) {
+                order.setOpen(leavesQty.getValue());
             }
         }
 
@@ -276,8 +327,8 @@ public class BanzaiApplication implements Application {
         orderTableModel.updateOrder(order, message.getField(new OrigClOrdID()).getValue());
     }
 
-    private boolean alreadyProcessed(ExecID execID, SessionID sessionID) {
-        HashSet<ExecID> set = execIDs.get(sessionID);
+    private boolean alreadyProcessed(String execID, SessionID sessionID) {
+        HashSet<String> set = execIDs.get(sessionID);
         if (set == null) {
             set = new HashSet<>();
             set.add(execID);
@@ -366,7 +417,18 @@ public class BanzaiApplication implements Application {
         newOrderSingle.set(new OrderQty(order.getQuantity()));
         newOrderSingle.set(new Symbol(order.getSymbol()));
         newOrderSingle.set(new HandlInst('1'));
+        newOrderSingle.set(new Account(Banzai.getAccount()));
         send(populateOrder(order, newOrderSingle), order.getSessionID());
+    }
+    
+    public void sendMDRequest() {
+        LOGGER.info("sending MDRequest");
+        quickfix.fix44.MarketDataRequest message = new quickfix.fix44.MarketDataRequest(
+                new MDReqID(String.valueOf(System.currentTimeMillis())), 
+                new SubscriptionRequestType(SubscriptionRequestType.SNAPSHOT_UPDATES),
+                new MarketDepth(0));
+        send(message, getSessionID());
+        LOGGER.info("sending MDRequest:DONE");
     }
 
     public void send50(Order order) {
@@ -387,6 +449,7 @@ public class BanzaiApplication implements Application {
             newOrderSingle.setField(new Price(order.getLimit()));
         else if (type == OrderType.STOP) {
             newOrderSingle.setField(new StopPx(order.getStop()));
+            newOrderSingle.setField(new TargetStrategy(150));
         } else if (type == OrderType.STOP_LIMIT) {
             newOrderSingle.setField(new Price(order.getLimit()));
             newOrderSingle.setField(new StopPx(order.getStop()));
@@ -412,6 +475,12 @@ public class BanzaiApplication implements Application {
                 break;
             case "FIX.4.2":
                 cancel42(order);
+                break;
+            case "FIX.4.4":
+                cancel44(order);
+                break;
+            default:
+                LOGGER.info("cancel not supported for {}", beginString);
                 break;
         }
     }
@@ -449,6 +518,40 @@ public class BanzaiApplication implements Application {
         send(message, order.getSessionID());
     }
 
+    public void cancel44(Order order) {
+        String id = order.generateID();
+        quickfix.fix44.OrderCancelRequest message = new quickfix.fix44.OrderCancelRequest(
+                new OrigClOrdID(order.getID()), new ClOrdID(id), sideToFIXSide(order.getSide()), new TransactTime());
+        message.setField(new OrderQty(order.getQuantity()));
+        message.setField(new Symbol(order.getSymbol()));
+        message.set(new Account(Banzai.getAccount()));
+        
+        orderTableModel.addID(order, id);
+        send(message, order.getSessionID());
+    }
+
+    public void massCancel(Order order, MassCancelRequestType massCancelRequestType) {
+        String beginString = order.getSessionID().getBeginString();
+        switch (beginString) {
+            case "FIX.4.4":
+                massCancel44(order, massCancelRequestType);
+                break;
+            default:
+                LOGGER.info("massCancel not supported for {}", beginString);
+                break;
+        }
+    }
+
+    public void massCancel44(Order order, MassCancelRequestType massCancelRequestType) {
+        String id = Order.generateID();
+        DigiOrderMassCancelRequest message = new DigiOrderMassCancelRequest(new ClOrdID(id), massCancelRequestType, new TransactTime());
+        message.set(new Account(Banzai.getAccount()));
+        if (massCancelRequestType.getValue() == MassCancelRequestType.CANCEL_ORDERS_FOR_A_SECURITY) message.set(new Symbol(order.getSymbol()));
+        else  if (massCancelRequestType.getValue() == MassCancelRequestType.CANCEL_ORDERS_FOR_AN_UNDERLYING_SECURITY) message.set(new UnderlyingSymbol(order.getSymbol()));
+        orderTableModel.addID(order, id);
+        send(message, order.getSessionID());
+    }
+
     public void replace(Order order, Order newOrder) {
         String beginString = order.getSessionID().getBeginString();
         switch (beginString) {
@@ -460,6 +563,9 @@ public class BanzaiApplication implements Application {
                 break;
             case "FIX.4.2":
                 replace42(order, newOrder);
+                break;
+            case "FIX.4.4":
+                replace44(order, newOrder);
                 break;
         }
     }
@@ -494,12 +600,39 @@ public class BanzaiApplication implements Application {
         send(populateCancelReplace(order, newOrder, message), order.getSessionID());
     }
 
-    Message populateCancelReplace(Order order, Order newOrder, quickfix.Message message) {
+    public void replace44(Order order, Order newOrder) {
+        quickfix.fix44.OrderCancelReplaceRequest message = new quickfix.fix44.OrderCancelReplaceRequest(
+                new OrigClOrdID(order.getID()), new ClOrdID(newOrder.getID()), sideToFIXSide(newOrder.getSide()), 
+                new TransactTime(), typeToFIXType(newOrder.getType()));
+        orderTableModel.addID(order, newOrder.getID());
+        send(populateCancelReplace(order, newOrder, message), order.getSessionID());
+    }
+
+    Message populateCancelReplaceOld(Order order, Order newOrder, quickfix.Message message) {
 
         if (order.getQuantity() != newOrder.getQuantity())
             message.setField(new OrderQty(newOrder.getQuantity()));
         if (!order.getLimit().equals(newOrder.getLimit()))
             message.setField(new Price(newOrder.getLimit()));
+        return message;
+    }
+
+    Message populateCancelReplace(Order order, Order newOrder, quickfix.Message message) {
+        message.setField(new OrderQty(newOrder.getQuantity()));            
+        OrderType orderType = newOrder.getType();
+        if (orderType == OrderType.LIMIT || orderType == OrderType.STOP_LIMIT) {
+            if (newOrder.getLimit() != null)
+                message.setField(new Price(newOrder.getLimit()));
+        }
+        if (orderType == OrderType.STOP_LIMIT) {
+            if (newOrder.getStop() != null)
+                message.setField(new StopPx(newOrder.getStop()));
+        }
+        message.setField(new Account(Banzai.getAccount()));
+        if (order.getOrderId() != null) message.setField(new OrderID(order.getOrderId()));
+        message.setField(new Symbol(order.getSymbol()));
+        message.setField(tifToFIXTif(order.getTIF()));
+        //nothing just testing compile
         return message;
     }
 

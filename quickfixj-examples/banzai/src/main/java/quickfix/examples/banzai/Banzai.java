@@ -19,6 +19,7 @@
 
 package quickfix.examples.banzai;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.concurrent.CountDownLatch;
@@ -55,6 +56,13 @@ public class Banzai {
     private Initiator initiator = null;
     private JFrame frame = null;
 
+    public static String account = null;
+
+    public static String getAccount() {
+        if (account == null) throw new RuntimeException("Account is null");
+        return account;
+    }
+
     public Banzai(String[] args) throws Exception {
         InputStream inputStream = null;
         if (args.length == 0) {
@@ -69,6 +77,25 @@ public class Banzai {
         SessionSettings settings = new SessionSettings(inputStream);
         inputStream.close();
 
+        log.info("settings loaded...");
+        
+//        String fileStorePath = settings.getString("FileStorePath");
+//        if (fileStorePath == null) {
+//            log.info("FileStorePath is not set");
+//        }
+//        File dataDir = new File(fileStorePath);
+//        if (dataDir.exists() && dataDir.isDirectory()) {
+//            File[] files = dataDir.listFiles();
+//            for (File file: files) {
+//                String fileName = file.getName();
+//                log.info(fileName+" is deleted: "+file.delete());
+//            }
+//        }
+
+        int accountId = Integer.parseInt(settings.getString("SenderCompID"))-1000000000;
+        account = String.valueOf(accountId);
+        log.info("accountId: "+accountId);
+        
         boolean logHeartbeats = Boolean.valueOf(System.getProperty("logHeartbeats", "true"));
 
         OrderTableModel orderTableModel = new OrderTableModel();
@@ -84,8 +111,12 @@ public class Banzai {
         JmxExporter exporter = new JmxExporter();
         exporter.register(initiator);
 
-        frame = new BanzaiFrame(orderTableModel, executionTableModel, application);
+        log.info("creating JFrame now...");
+        
+        frame = new BanzaiFrame(orderTableModel, executionTableModel, application, String.valueOf(accountId));
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        log.info("creating JFrame now...DONE");
     }
 
     public synchronized void logon() {
@@ -127,10 +158,14 @@ public class Banzai {
         } catch (Exception e) {
             log.info(e.getMessage(), e);
         }
+        System.getProperties().setProperty("openfix", "");
         banzai = new Banzai(args);
-        if (!System.getProperties().containsKey("openfix")) {
-            banzai.logon();
-        }
+        log.info("sending logon...");
+        banzai.logon();
+//        if (!System.getProperties().containsKey("openfix")) {
+//            banzai.logon();
+//        }
+        log.info("waiting...");
         shutdownLatch.await();
     }
 

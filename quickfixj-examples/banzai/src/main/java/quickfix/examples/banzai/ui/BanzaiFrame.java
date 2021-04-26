@@ -21,11 +21,7 @@ package quickfix.examples.banzai.ui;
 
 import java.awt.BorderLayout;
 
-import javax.swing.JCheckBoxMenuItem;
-import javax.swing.JFrame;
-import javax.swing.JMenu;
-import javax.swing.JMenuBar;
-import javax.swing.JMenuItem;
+import javax.swing.*;
 
 import quickfix.examples.banzai.Banzai;
 import quickfix.examples.banzai.BanzaiApplication;
@@ -38,17 +34,19 @@ import quickfix.examples.banzai.OrderTableModel;
 public class BanzaiFrame extends JFrame {
 
     public BanzaiFrame(OrderTableModel orderTableModel, ExecutionTableModel executionTableModel,
-            final BanzaiApplication application) {
+            final BanzaiApplication application, final String clientID) {
         super();
-        setTitle("Banzai!");
-        setSize(600, 400);
+        setTitle("Client: "+clientID);
+        setSize(850, 500);
 
         if (System.getProperties().containsKey("openfix")) {
             createMenuBar(application);
         }
         getContentPane().add(new BanzaiPanel(orderTableModel, executionTableModel, application),
                 BorderLayout.CENTER);
-        setVisible(true);
+        SwingUtilities.invokeLater(() -> {
+            setVisible(true);       
+        });
     }
 
     private void createMenuBar(final BanzaiApplication application) {

@@ -24,8 +24,8 @@ import quickfix.SessionID;
 public class Order implements Cloneable {
     private SessionID sessionID = null;
     private String symbol = null;
-    private int quantity = 0;
-    private int open = 0;
+    private Double quantity = null;
+    private Double open = null;
     private double executed = 0;
     private OrderSide side = OrderSide.BUY;
     private OrderType type = OrderType.MARKET;
@@ -39,6 +39,7 @@ public class Order implements Cloneable {
     private String message = null;
     private String ID = null;
     private String originalID = null;
+    private String orderId = null;
     private static int nextID = 1;
 
     public Order() {
@@ -59,7 +60,7 @@ public class Order implements Cloneable {
         return null;
     }
 
-    public String generateID() {
+    public static String generateID() {
         return Long.toString(System.currentTimeMillis() + (nextID++));
     }
 
@@ -79,19 +80,19 @@ public class Order implements Cloneable {
         this.symbol = symbol;
     }
 
-    public int getQuantity() {
+    public Double getQuantity() {
         return quantity;
     }
 
-    public void setQuantity(int quantity) {
+    public void setQuantity(Double quantity) {
         this.quantity = quantity;
     }
 
-    public int getOpen() {
+    public Double getOpen() {
         return open;
     }
 
-    public void setOpen(int open) {
+    public void setOpen(Double open) {
         this.open = open;
     }
 
@@ -211,5 +212,13 @@ public class Order implements Cloneable {
 
     public String getOriginalID() {
         return originalID;
+    }
+
+    public String getOrderId() {
+        return orderId;
+    }
+
+    public void setOrderId(String orderId) {
+        this.orderId = orderId;
     }
 }

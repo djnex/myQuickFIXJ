@@ -24,14 +24,23 @@ import java.awt.*;
 import java.awt.event.*;
 
 import quickfix.examples.banzai.*;
+import quickfix.field.MassCancelRequestType;
+import quickfix.field.Side;
 
 public class CancelReplacePanel extends JPanel {
     private final JLabel quantityLabel = new JLabel("Quantity");
     private final JLabel limitPriceLabel = new JLabel("Limit");
-    private final IntegerNumberTextField quantityTextField = new IntegerNumberTextField();
-    private final DoubleNumberTextField limitPriceTextField = new DoubleNumberTextField();
+    private final JLabel stopLabel = new JLabel("Stop");
+    private final SignedDoubleNumberTextField quantityTextField = new SignedDoubleNumberTextField();
+    private final SignedDoubleNumberTextField limitPriceTextField = new SignedDoubleNumberTextField();
+    private final SignedDoubleNumberTextField stopPriceTextField = new SignedDoubleNumberTextField();
     private final JButton cancelButton = new JButton("Cancel");
+    private final JButton massCancelButton = new JButton("MC");
+    private final JButton massCancelButtonSym = new JButton("MC_Symbol");
+    private final JButton massCancelButtonUSym = new JButton("MC_Underlying");
     private final JButton replaceButton = new JButton("Replace");
+    private final JComboBox typeComboBox = new JComboBox(OrderType.toArray());
+    private final JComboBox sideComboBox = new JComboBox(OrderSide.toArray());
     private Order order = null;
 
     private final GridBagConstraints constraints = new GridBagConstraints();
@@ -41,14 +50,21 @@ public class CancelReplacePanel extends JPanel {
     public CancelReplacePanel(final BanzaiApplication application) {
         this.application = application;
         cancelButton.addActionListener(new CancelListener());
+        massCancelButton.addActionListener(new MassCancelListener());
+        massCancelButtonSym.addActionListener(new MassCancelListenerSymbol());
+        massCancelButtonUSym.addActionListener(new MassCancelListenerUnderlyingSymbol());
         replaceButton.addActionListener(new ReplaceListener());
-
+        typeComboBox.setSelectedItem(OrderType.LIMIT);
+        sideComboBox.setSelectedItem(Side.BUY);
         setLayout(new GridBagLayout());
         createComponents();
     }
 
     public void addActionListener(ActionListener listener) {
         cancelButton.addActionListener(listener);
+        massCancelButton.addActionListener(listener);
+        massCancelButtonSym.addActionListener(listener);
+        massCancelButtonUSym.addActionListener(listener);
         replaceButton.addActionListener(listener);
     }
 
@@ -61,7 +77,15 @@ public class CancelReplacePanel extends JPanel {
 
         constraints.insets = new Insets(0, 0, 5, 5);
         add(cancelButton, x, y);
-        add(replaceButton, ++x, y);
+        add(massCancelButton, ++x, y);
+        add(massCancelButtonSym, ++x, y);
+        add(massCancelButtonUSym, ++x, y);
+        x = 0;
+        add(replaceButton, x, ++y);
+        typeComboBox.setName("TypeComboBox");
+        add(typeComboBox, ++x, y);
+        sideComboBox.setName("SideComboBox");
+        add(sideComboBox, ++x, y);
         constraints.weightx = 0;
         add(quantityLabel, ++x, y);
         constraints.weightx = 5;
@@ -70,20 +94,28 @@ public class CancelReplacePanel extends JPanel {
         add(limitPriceLabel, ++x, y);
         constraints.weightx = 5;
         add(limitPriceTextField, ++x, y);
+        add(stopLabel, ++x, y);
+        add(stopPriceTextField, ++x, y);
     }
 
     public void setEnabled(boolean enabled) {
         cancelButton.setEnabled(enabled);
-        replaceButton.setEnabled(enabled);
+        massCancelButton.setEnabled(true);
+        massCancelButtonSym.setEnabled(true);
+        massCancelButtonUSym.setEnabled(true);
+        replaceButton.setEnabled(true);
         quantityTextField.setEnabled(enabled);
         limitPriceTextField.setEnabled(enabled);
+        stopPriceTextField.setEnabled(enabled);
 
         Color labelColor = enabled ? Color.black : Color.gray;
         Color bgColor = enabled ? Color.white : Color.gray;
         quantityTextField.setBackground(bgColor);
         limitPriceTextField.setBackground(bgColor);
+        stopPriceTextField.setBackground(bgColor);
         quantityLabel.setForeground(labelColor);
         limitPriceLabel.setForeground(labelColor);
+        stopLabel.setForeground(labelColor);
     }
 
     public void update() {
@@ -95,11 +127,24 @@ public class CancelReplacePanel extends JPanel {
             return;
         this.order = order;
         quantityTextField.setText
-        (Integer.toString(order.getOpen()));
+        (Double.toString(order.getQuantity()));
 
         Double limit = order.getLimit();
         if (limit != null)
             limitPriceTextField.setText(order.getLimit().toString());
+
+        Double stop = order.getStop();
+        if (stop != null)
+            stopPriceTextField.setText(stop.toString());
+        
+        OrderType orderType = order.getType();
+        if (orderType != null) {
+            typeComboBox.setSelectedItem(orderType);
+        }
+        OrderSide side = order.getSide();
+        if (side != null) {
+            sideComboBox.setSelectedItem(side);
+        }
         setEnabled(order.getOpen() > 0);
     }
 
@@ -116,17 +161,44 @@ public class CancelReplacePanel extends JPanel {
         }
     }
 
+    private class MassCancelListener implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            application.massCancel(order, new MassCancelRequestType(MassCancelRequestType.CANCEL_ALL_ORDERS));
+        }
+    }
+
+    private class MassCancelListenerSymbol implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            application.massCancel(order, new MassCancelRequestType(MassCancelRequestType.CANCEL_ORDERS_FOR_A_SECURITY));
+        }
+    }
+    
+    private class MassCancelListenerUnderlyingSymbol implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            application.massCancel(order, new MassCancelRequestType(MassCancelRequestType.CANCEL_ORDERS_FOR_AN_UNDERLYING_SECURITY));
+        }
+    }
+
     private class ReplaceListener implements ActionListener {
         public void actionPerformed(ActionEvent e) {
             Order newOrder = (Order) order.clone();
-            newOrder.setQuantity
-            (Integer.parseInt(quantityTextField.getText()));
-            newOrder.setLimit(Double.parseDouble(limitPriceTextField.getText()));
+            newOrder.setQuantity(Double.parseDouble(quantityTextField.getText()));
+            OrderType orderType = (OrderType) typeComboBox.getSelectedItem();
+            newOrder.setType(orderType);
+            if (orderType == OrderType.LIMIT || orderType == OrderType.STOP_LIMIT) {
+                newOrder.setLimit(Double.parseDouble(limitPriceTextField.getText()));    
+            } else {
+                newOrder.setLimit("");
+            }
+            if (orderType == OrderType.STOP_LIMIT) {
+                newOrder.setStop(stopPriceTextField.getText());
+            }
+            newOrder.setSide((OrderSide) sideComboBox.getSelectedItem());
             newOrder.setRejected(false);
             newOrder.setCanceled(false);
-            newOrder.setOpen(0);
-            newOrder.setExecuted(0);
-
+//            newOrder.setOpen(0);
+//            newOrder.setExecuted(0);
+            newOrder.setSymbol(order.getSymbol());
             application.replace(order, newOrder);
         }
     }
