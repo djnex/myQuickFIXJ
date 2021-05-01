@@ -36,8 +36,6 @@ import quickfix.SessionID;
 import quickfix.SessionNotFound;
 import quickfix.UnsupportedMessageType;
 import quickfix.field.*;
-import quickfix.fix44.MarketDataRequest;
-import quickfix.fix44.OrderMassCancelReport;
 
 import javax.swing.*;
 import java.math.BigDecimal;
@@ -129,7 +127,7 @@ public class BanzaiApplication implements Application {
 //                        sendSessionReject(message, SessionRejectReason.COMPID_PROBLEM);
                         LOGGER.error("sendSessionReject COMPID_PROBLEM");
                     } else if (message.getHeader().getField(msgType).valueEquals("8")) {
-                        executionReport(message, sessionID);
+                        executionReportHandler(message, sessionID);
                     } else if (message.getHeader().getField(msgType).valueEquals("9")) {
                         cancelReject(message, sessionID);
                     }
@@ -186,7 +184,7 @@ public class BanzaiApplication implements Application {
                 message.getHeader().getString(SenderCompID.FIELD));
     }
 
-    private void executionReport(Message message, SessionID sessionID) throws FieldNotFound {
+    private void executionReportHandler(Message message, SessionID sessionID) throws FieldNotFound {
 
         OrderID orderID = (OrderID) message.getField(new OrderID());
         if (orderID == null/* || alreadyProcessed(orderID.getValue(), sessionID)*/) {

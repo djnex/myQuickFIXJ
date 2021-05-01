@@ -312,6 +312,7 @@ public class OrderEntryPanel extends JPanel implements Observer {
             } else if (obj == stopPriceTextField) {
                 stopEntered = testField(obj);
             }
+            if(e.getKeyCode() == 10) nosSubmit();
             activateSubmit();
         }
 
