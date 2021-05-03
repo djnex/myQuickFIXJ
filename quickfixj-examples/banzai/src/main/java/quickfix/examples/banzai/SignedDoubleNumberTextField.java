@@ -8,7 +8,7 @@ public class SignedDoubleNumberTextField extends JTextField {
         char keyChar = e.getKeyChar();
         int keyCode = e.getKeyCode();
         if (((keyChar >= '0') && (keyChar <= '9')) ||
-                (keyChar == 8) || (keyChar == 10) || (e.isControlDown() && keyCode == 65) || (keyCode == 37) || (keyCode == 39) || (keyChar == 127) || (keyChar == 45)) {
+                (keyChar == 8) || (keyChar == 10) || (e.isControlDown() && (keyCode == 65 || keyCode == 67 || keyCode == 88 || keyCode == 86)) || (keyCode == 37) || (keyCode == 39) || (keyChar == 127) || (keyChar == 45)) {
             super.processKeyEvent(e);
         } else if (keyChar == '.') {
             String text = getText();
