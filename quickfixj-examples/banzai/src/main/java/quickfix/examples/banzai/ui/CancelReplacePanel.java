@@ -35,6 +35,7 @@ public class CancelReplacePanel extends JPanel {
     private final SignedDoubleNumberTextField limitPriceTextField = new SignedDoubleNumberTextField();
     private final SignedDoubleNumberTextField stopPriceTextField = new SignedDoubleNumberTextField();
     private final JButton cancelButton = new JButton("Cancel");
+    private final JButton cancelByOrderIdButton = new JButton("CancelByOrderId");
     private final JButton massCancelButton = new JButton("MC");
     private final JButton massCancelButtonSym = new JButton("MC_Symbol");
     private final JButton massCancelButtonUSym = new JButton("MC_Underlying");
@@ -50,6 +51,7 @@ public class CancelReplacePanel extends JPanel {
     public CancelReplacePanel(final BanzaiApplication application) {
         this.application = application;
         cancelButton.addActionListener(new CancelListener());
+        cancelByOrderIdButton.addActionListener(new CancelByOrderIdListener());
         massCancelButton.addActionListener(new MassCancelListener());
         massCancelButtonSym.addActionListener(new MassCancelListenerSymbol());
         massCancelButtonUSym.addActionListener(new MassCancelListenerUnderlyingSymbol());
@@ -62,6 +64,7 @@ public class CancelReplacePanel extends JPanel {
 
     public void addActionListener(ActionListener listener) {
         cancelButton.addActionListener(listener);
+        cancelByOrderIdButton.addActionListener(listener);
         massCancelButton.addActionListener(listener);
         massCancelButtonSym.addActionListener(listener);
         massCancelButtonUSym.addActionListener(listener);
@@ -77,6 +80,7 @@ public class CancelReplacePanel extends JPanel {
 
         constraints.insets = new Insets(0, 0, 5, 5);
         add(cancelButton, x, y);
+        add(cancelByOrderIdButton, ++x, y);
         add(massCancelButton, ++x, y);
         add(massCancelButtonSym, ++x, y);
         add(massCancelButtonUSym, ++x, y);
@@ -100,6 +104,7 @@ public class CancelReplacePanel extends JPanel {
 
     public void setEnabled(boolean enabled) {
         cancelButton.setEnabled(enabled);
+        cancelByOrderIdButton.setEnabled(enabled);
         massCancelButton.setEnabled(true);
         massCancelButtonSym.setEnabled(true);
         massCancelButtonUSym.setEnabled(true);
@@ -158,6 +163,12 @@ public class CancelReplacePanel extends JPanel {
     private class CancelListener implements ActionListener {
         public void actionPerformed(ActionEvent e) {
             application.cancel(order);
+        }
+    }
+
+    private class CancelByOrderIdListener implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            application.cancel44_byOrderId(order);
         }
     }
 

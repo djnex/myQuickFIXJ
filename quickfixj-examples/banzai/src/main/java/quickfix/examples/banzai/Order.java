@@ -41,6 +41,7 @@ public class Order implements Cloneable {
     private String originalID = null;
     private String orderId = null;
     private static int nextID = 1;
+    private String text;
 
     public Order() {
         ID = generateID();
@@ -86,6 +87,14 @@ public class Order implements Cloneable {
 
     public void setQuantity(Double quantity) {
         this.quantity = quantity;
+    }
+
+    public String getText() {
+        return text;
+    }
+
+    public void setText(String text) {
+        this.text = text;
     }
 
     public Double getOpen() {

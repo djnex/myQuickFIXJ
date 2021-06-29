@@ -28,6 +28,7 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.util.Observable;
 import java.util.Observer;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -37,6 +38,8 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import quickfix.SessionID;
 import quickfix.examples.banzai.BanzaiApplication;
 import quickfix.examples.banzai.DoubleNumberTextField;
@@ -51,6 +54,7 @@ import quickfix.examples.banzai.SignedDoubleNumberTextField;
 
 @SuppressWarnings("unchecked")
 public class OrderEntryPanel extends JPanel implements Observer {
+    private final static Logger LOGGER = LoggerFactory.getLogger(OrderEntryPanel.class);
     private boolean symbolEntered = false;
     private boolean quantityEntered = false;
     private boolean limitEntered = false;
@@ -74,9 +78,14 @@ public class OrderEntryPanel extends JPanel implements Observer {
 
     private final JLabel messageLabel = new JLabel(" ");
     private final JButton submitButton = new JButton("Submit");
+    private final JButton submitButton2 = new JButton("Submit2");
     private final JButton nosCancelButton = new JButton("NosCancel");
     private final JButton nosAmendButton = new JButton("NosAmend");
+    private final JButton stressButton = new JButton("Stress");
+    private final JButton stopStressButton = new JButton("StopStress");
 
+    private volatile boolean isStressed = false;
+    
     private OrderTableModel orderTableModel = null;
     private transient BanzaiApplication application = null;
 
@@ -164,7 +173,10 @@ public class OrderEntryPanel extends JPanel implements Observer {
 //        x = 0;
         add(nosCancelButton, ++x, y);
         add(nosAmendButton, ++x, y);
+        add(stressButton, ++x, y);
+        add(stopStressButton, ++x, y);
         add(submitButton, ++x, y);
+        add(submitButton2, ++x, y);
 //        constraints.gridwidth = GridBagConstraints.REMAINDER;
 //        submitButton.setName("SubmitButton");
         constraints.gridwidth = 0;
@@ -180,10 +192,16 @@ public class OrderEntryPanel extends JPanel implements Observer {
         messageLabel.setHorizontalAlignment(JLabel.CENTER);
         submitButton.setEnabled(true);
         submitButton.addActionListener(new NewOrderSingleListener());
+        submitButton2.setEnabled(true);
+        submitButton2.addActionListener(new NewOrderSingleListener2());
         nosCancelButton.setEnabled(true);
         nosAmendButton.setEnabled(true);
+        stressButton.setEnabled(true);
+        stopStressButton.setEnabled(true);
         nosCancelButton.addActionListener(new NosCancelListener());
         nosAmendButton.addActionListener(new NosAmendListener());
+        stressButton.addActionListener(new StressListener());
+        stopStressButton.addActionListener(new StopStressListener());
         activateSubmit();
     }
 
@@ -258,6 +276,12 @@ public class OrderEntryPanel extends JPanel implements Observer {
         }
     }
 
+    private class NewOrderSingleListener2 implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            nosSubmit2();
+        }
+    }
+
     private class NosCancelListener implements ActionListener {
         public void actionPerformed(ActionEvent e) {
             Order order = nosSubmit();
@@ -265,6 +289,28 @@ public class OrderEntryPanel extends JPanel implements Observer {
         }
     }
 
+    private class StressListener implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            new Thread(()-> {
+                isStressed = true;
+                LOGGER.info("SystemOnStress");
+                while (isStressed) {
+                    Order order = nosSubmit();
+                    application.cancel(order);
+                }
+                LOGGER.info("SystemOnStress: DONE");
+            }, "systemOnStress").start();
+        }
+    }
+
+    private class StopStressListener implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            new Thread(()-> {
+                isStressed = false;
+            }, "StopStress").start();
+        }
+    }
+    
     private class NosAmendListener implements ActionListener {
         public void actionPerformed(ActionEvent e) {
             Order order = nosSubmit();
@@ -272,6 +318,29 @@ public class OrderEntryPanel extends JPanel implements Observer {
             newOrder.setQuantity(8.00);
             application.replace(order, newOrder);
         }
+    }
+
+    private Order nosSubmit2() {
+        Order order = new Order();
+        order.setSide((OrderSide) sideComboBox.getSelectedItem());
+        order.setType((OrderType) typeComboBox.getSelectedItem());
+        order.setTIF((OrderTIF) tifComboBox.getSelectedItem());
+
+        order.setSymbol(symbolTextField.getText());
+        order.setQuantity(Double.parseDouble(quantityTextField.getText()));
+        order.setOpen(order.getQuantity());
+        order.setText("extraField");
+
+        OrderType type = order.getType();
+        if (type == OrderType.LIMIT || type == OrderType.STOP_LIMIT)
+            order.setLimit(limitPriceTextField.getText());
+        if (type == OrderType.STOP || type == OrderType.STOP_LIMIT)
+            order.setStop(stopPriceTextField.getText());
+        order.setSessionID((SessionID) sessionComboBox.getSelectedItem());
+
+        orderTableModel.addOrder(order);
+        application.send(order);
+        return order;
     }
 
     private Order nosSubmit() {

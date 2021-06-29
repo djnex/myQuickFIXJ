@@ -416,6 +416,9 @@ public class BanzaiApplication implements Application {
         newOrderSingle.set(new Symbol(order.getSymbol()));
         newOrderSingle.set(new HandlInst('1'));
         newOrderSingle.set(new Account(Banzai.getAccount()));
+        if (order.getText() != null && !order.getText().isEmpty()) {
+            newOrderSingle.set(new Text(order.getText()));
+        }
         send(populateOrder(order, newOrderSingle), order.getSessionID());
     }
     
@@ -516,6 +519,19 @@ public class BanzaiApplication implements Application {
         send(message, order.getSessionID());
     }
 
+    public void cancel44_byOrderId(Order order) {
+        String id = order.generateID();
+        quickfix.fix44.OrderCancelRequest message = new quickfix.fix44.OrderCancelRequest(
+                new OrigClOrdID(order.getOrderId()), new ClOrdID(id), sideToFIXSide(order.getSide()), new TransactTime());
+        message.setField(new OrderID(order.getOrderId()));
+        message.setField(new OrderQty(order.getQuantity()));
+        message.setField(new Symbol(order.getSymbol()));
+        message.set(new Account(Banzai.getAccount()));
+
+        orderTableModel.addID(order, id);
+        send(message, order.getSessionID());
+    }
+    
     public void cancel44(Order order) {
         String id = order.generateID();
         quickfix.fix44.OrderCancelRequest message = new quickfix.fix44.OrderCancelRequest(
