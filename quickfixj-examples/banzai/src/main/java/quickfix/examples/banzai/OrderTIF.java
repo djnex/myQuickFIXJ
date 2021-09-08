@@ -29,8 +29,9 @@ public class OrderTIF {
     static public final OrderTIF OPG = new OrderTIF("OPG");
     static public final OrderTIF GTC = new OrderTIF("GTC");
     static public final OrderTIF GTX = new OrderTIF("GTX");
+    static public final OrderTIF FOK = new OrderTIF("FOK");
 
-    static private final OrderTIF[] array = { DAY, IOC, OPG, GTC, GTX };
+    static private final OrderTIF[] array = { DAY, IOC, OPG, GTC, GTX, FOK };
 
     private final String name;
 

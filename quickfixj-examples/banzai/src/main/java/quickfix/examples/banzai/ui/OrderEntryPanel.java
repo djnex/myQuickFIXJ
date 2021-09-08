@@ -28,22 +28,13 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.util.Observable;
 import java.util.Observer;
-import java.util.concurrent.atomic.AtomicBoolean;
 
-import javax.swing.BorderFactory;
-import javax.swing.JButton;
-import javax.swing.JComboBox;
-import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JTextField;
+import javax.swing.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import quickfix.SessionID;
 import quickfix.examples.banzai.BanzaiApplication;
-import quickfix.examples.banzai.DoubleNumberTextField;
-import quickfix.examples.banzai.IntegerNumberTextField;
 import quickfix.examples.banzai.LogonEvent;
 import quickfix.examples.banzai.Order;
 import quickfix.examples.banzai.OrderSide;
@@ -61,6 +52,9 @@ public class OrderEntryPanel extends JPanel implements Observer {
     private boolean stopEntered = false;
     private boolean sessionEntered = false;
 
+    private final JTextField rawFixTextField = new JTextField();
+    private final JButton submitRawButton = new JButton("SubmitRaw");
+    
     private final JTextField symbolTextField = new JTextField();
     private final SignedDoubleNumberTextField quantityTextField = new SignedDoubleNumberTextField();
 
@@ -78,7 +72,7 @@ public class OrderEntryPanel extends JPanel implements Observer {
 
     private final JLabel messageLabel = new JLabel(" ");
     private final JButton submitButton = new JButton("Submit");
-    private final JButton submitButton2 = new JButton("Submit2");
+    private final JButton submitButton2 = new JButton("SubmitXtra");
     private final JButton nosCancelButton = new JButton("NosCancel");
     private final JButton nosAmendButton = new JButton("NosAmend");
     private final JButton stressButton = new JButton("Stress");
@@ -182,6 +176,13 @@ public class OrderEntryPanel extends JPanel implements Observer {
         constraints.gridwidth = 0;
         add(messageLabel, 0, ++y);
 
+        constraints.insets = new Insets(3, 0, 0, 0);
+        x = 0;
+        add(rawFixTextField, x, ++y);
+        constraints.ipadx = 0;
+        add(submitRawButton, x, ++y);
+        constraints.gridwidth = 0;
+
         typeComboBox.addItemListener(new PriceListener());
         typeComboBox.setSelectedItem(OrderType.STOP);
         typeComboBox.setSelectedItem(OrderType.MARKET);
@@ -192,6 +193,7 @@ public class OrderEntryPanel extends JPanel implements Observer {
         messageLabel.setHorizontalAlignment(JLabel.CENTER);
         submitButton.setEnabled(true);
         submitButton.addActionListener(new NewOrderSingleListener());
+        submitRawButton.addActionListener(new NewOrderSingleRawListener());
         submitButton2.setEnabled(true);
         submitButton2.addActionListener(new NewOrderSingleListener2());
         nosCancelButton.setEnabled(true);
@@ -276,6 +278,12 @@ public class OrderEntryPanel extends JPanel implements Observer {
         }
     }
 
+    private class NewOrderSingleRawListener implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            nosRawSubmit();
+        }
+    }
+
     private class NewOrderSingleListener2 implements ActionListener {
         public void actionPerformed(ActionEvent e) {
             nosSubmit2();
@@ -343,6 +351,43 @@ public class OrderEntryPanel extends JPanel implements Observer {
         return order;
     }
 
+    static final Order parseRawText(String text) {
+        char code = '\u0001';
+        String[] pairs = text.split(String.valueOf(code));
+        for (int i=0;i<pairs.length;i++)
+            System.out.println(pairs[i]);
+        return null;
+    }
+
+    public static void main(String[] args) {
+        String input = "8=FIX.4.4\u00019=151\u000135=D\u000134=2\u000149=1000000031\u000152=20210811-07:53:31.601\u000156=diginex\u00011=31\u000111=1628668411576\u000121=1\u000138=1\u000140=2\u000144=100\u000154=1\u000155=BTC/USDC\u000159=0\u000160=20210811-07:53:31.599\u000110=036\u0001";
+        parseRawText(input);
+    }
+    
+    private Order nosRawSubmit() {
+//        String text = rawFixTextField.getText();
+//        Order order = parseRawText(text);
+        Order order = new Order();
+        order.setSide((OrderSide) sideComboBox.getSelectedItem());
+        order.setType((OrderType) typeComboBox.getSelectedItem());
+//        order.setTIF((OrderTIF) tifComboBox.getSelectedItem());
+
+        order.setSymbol(symbolTextField.getText());
+        order.setQuantity(Double.parseDouble(quantityTextField.getText()));
+        order.setOpen(order.getQuantity());
+
+        OrderType type = order.getType();
+        if (type == OrderType.LIMIT || type == OrderType.STOP_LIMIT)
+            order.setLimit(limitPriceTextField.getText());
+        if (type == OrderType.STOP || type == OrderType.STOP_LIMIT)
+            order.setStop(stopPriceTextField.getText());
+        order.setSessionID((SessionID) sessionComboBox.getSelectedItem());
+
+        orderTableModel.addOrder(order);
+        application.send(order);
+        return null;
+    }
+    
     private Order nosSubmit() {
         Order order = new Order();
         order.setSide((OrderSide) sideComboBox.getSelectedItem());

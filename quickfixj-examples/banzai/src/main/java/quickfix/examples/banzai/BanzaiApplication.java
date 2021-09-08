@@ -461,7 +461,7 @@ public class BanzaiApplication implements Application {
             newOrderSingle.setField(new LocateReqd(false));
         }
 
-        newOrderSingle.setField(tifToFIXTif(order.getTIF()));
+        if (order.getTIF() != null) newOrderSingle.setField(tifToFIXTif(order.getTIF()));
         return newOrderSingle;
     }
 
@@ -730,6 +730,7 @@ public class BanzaiApplication implements Application {
         tifMap.put(OrderTIF.OPG, new TimeInForce(TimeInForce.AT_THE_OPENING));
         tifMap.put(OrderTIF.GTC, new TimeInForce(TimeInForce.GOOD_TILL_CANCEL));
         tifMap.put(OrderTIF.GTX, new TimeInForce(TimeInForce.GOOD_TILL_CROSSING));
+        tifMap.put(OrderTIF.FOK, new TimeInForce(TimeInForce.FILL_OR_KILL));
     }
 
     public boolean isMissingField() {
